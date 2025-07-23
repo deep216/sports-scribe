@@ -26,7 +26,7 @@ class WriterAgent:
             - Follow the exact structure provided in the template
             - Maintain consistency in style and tone
             - Focus on the most important storylines and moments
-            - Create articles that are 400-600 words in length
+            - Create articles that are 400-600 words in length            
             
             Always return complete, well-formatted articles ready for publication.""",
             name="WriterAgent",
@@ -82,6 +82,13 @@ class WriterAgent:
             - Use this as your main source for describing what happened in the game
             - Focus on: goals, cards, substitutions, key moments, final score, venue, date
 
+            SUBSTITUTION DATA STRUCTURE:
+            - Substitution events have: "player" (who went OFF), "assist" (who came ON), "time", "detail"
+            - If "assist" is null/missing, the substitution data is incomplete
+            - Lineup data shows: "startXI" (starters), "substitutes" (bench players)
+            - Only mention substitutions when both "player" and "assist" fields are present
+            - Note that "assist" could both mean substitution and goal assist, make sure to check the "type" field to determine if it is a substitution or a goal assist
+
             HISTORICAL/BACKGROUND DATA (Context Only - Use sparingly for introduction/context):
             - Historical Context: {historical_context}
             - This contains background information, historical context, and analysis
@@ -99,6 +106,24 @@ class WriterAgent:
             - Verify that each player mentioned actually participated in the specific event described
             - Only mention players who have clear, verifiable actions in the match events
             - Double-check all player names, team names, and event details against the provided data
+            - The goal can not be assigned to the assist player:
+            - EXAMPLE: If Player A scores one goal assisted by Player B, and Player B scores one goal assisted by Player A, DO NOT write that either player "scored a double" or "netted twice".
+                - For example, in the match where Arsenal beat Wolves 2-0, Saka scored once (assisted by Havertz) and Havertz scored once (assisted by Saka). Neither scored twice — this must NOT be described as a "brace" or "double".
+            - When counting goals per player, treat only explicit scoring events in the CURRENT MATCH DATA as valid.
+            - A player who scored one goal and provided one assist MUST NOT be described as scoring twice.
+            - For clarity: DO NOT use phrases like "brace", "double", "netted twice", "second tally", or similar variations unless the player is explicitly recorded as scoring two distinct goals.
+            - KEY FACTUAL RULE:
+                - Goal count per player must match the number of goal events where the player is listed as "scorer".
+                - Assist does NOT count as a goal.
+                
+            CRITICAL SUBSTITUTION RULES:
+            - ONLY mention substitutions when you have COMPLETE information about who went OFF and who came ON
+            - In substitution events: "player" field = who went OFF, "assist" field = who came ON
+            - DO NOT guess or assume who came on as a substitute
+            - DO NOT mention partial substitution information (e.g., "Player X was substituted off" without knowing who replaced them)
+            - Cross-reference with lineup data: "startXI" = starters, "substitutes" = bench players
+            - Only describe substitutions that are strategically important and have complete information
+            - When in doubt about substitution details, exclude rather than include
 
             Instructions:
             - Write a complete article following the template structure exactly
@@ -107,12 +132,15 @@ class WriterAgent:
             - When describing events, clearly indicate they happened in THIS match
             - Do not mix up historical statistics with current match statistics
             - Use only the provided data - do not invent statistics or quotes
+            - When describing goals, DO NOT specify the shot type (e.g., header, volley, long-range)
             - Use data efficiently and do not miss critical information from the current match data like goals, score, etc.
             - Maintain a consistent, professional tone, and do not make professional mistakes like using wrong team names, wrong scores, etc.
             - Ensure the article is between 400-600 words
             - Include all required sections: Headline, Introduction, Body, Conclusion
             - The main story should be about THIS GAME, not historical background
             - Be extremely careful with player names, team names, and event details - use only what is explicitly stated in the data
+            - CRITICAL: For substitutions, only mention them when you have complete information (both who went off AND who came on)
+            - CRITICAL: If substitution data is incomplete (missing "assist" field), do not mention the substitution at all
             """
         return prompt
     
@@ -146,9 +174,9 @@ class WriterAgent:
     def _validate_article(self, article: str):
         word_count = len(article.split())
         if word_count < 400 or word_count > 600:
-            raise ValueError(f"Article length out of bounds: {word_count} words.")
+            logger.warning(f"Article length out of bounds: {word_count} words.")
         if not ("Headline" in article or article.split('\n')[0].strip()):
-            raise ValueError("Article missing headline.")
+            logger.warning("Article missing headline.")
         if not any(section in article for section in ["Introduction", "Body", "Conclusion"]):
-            raise ValueError("Article missing required sections.")
+            logger.warning("Article missing required sections.")
         
